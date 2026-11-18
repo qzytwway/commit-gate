@@ -43,7 +43,7 @@ commit-gate 用 Claude Code 的 hooks（在 Claude 执行某条命令前自动�
    git clone https://github.com/qzytwway/commit-gate.git ~/.claude/skills/commit-gate
    ```
 
-2. 在想加关卡的项目里，对 Claude 说“给这个项目装上 commit gate”。Claude 会按 [SKILL.md](SKILL.md) 的步骤完成安装、跑一次检查，并把结果告诉你。
+2. 在想加关卡的项目里打开 Claude Code，输入 `/commit-gate`（或者直接说“给这个项目装上 commit gate”）。Claude 会按 [SKILL.md](SKILL.md) 的步骤完成安装、跑一次检查，并把结果告诉你。
 
    也可以在项目根目录手动运行安装脚本：
 
@@ -51,7 +51,7 @@ commit-gate 用 Claude Code 的 hooks（在 Claude 执行某条命令前自动�
    bash ~/.claude/skills/commit-gate/setup.sh
    ```
 
-   手动安装后，还要把 [SKILL.md](SKILL.md) 第 4 步里那段“Committing”说明加进项目的 `CLAUDE.md`，Claude 才知道提交前要先跑脚本。
+   手动安装后关卡就已经生效：即使 Claude 不知道要先跑脚本，提交也会被 hook 拦下，拦截提示会告诉它去运行 `scripts/lint-gate.sh run`。建议再把 [SKILL.md](SKILL.md) 第 4 步里那段“Committing”说明加进项目的 `CLAUDE.md`，这样 Claude 第一次提交就会先跑脚本，不会先撞一次墙；它也会知道几条规矩：装 linter 前先问你、不许绕过 hook、写文件别用 heredoc（在命令里直接塞一大段文本的写法，hook 可能把它误当成提交命令）。
 
 安装会在项目里生成或修改这些文件（需要你提交它们）：
 
@@ -114,7 +114,7 @@ COVERED='vue sql'
 
 ## 注意
 
-- 只管 Claude 发起的提交，你自己在终端里敲的 `git commit` 不受影响。
+- 只管 Claude 发起的提交，你自己在终端里敲的 `git commit` 不受影响。因为关卡装在 Claude Code 的 hook 里（`.claude/settings.json`），不是 git 自己的 pre-commit hook（`.git/hooks/pre-commit`）。
 - 缺少 linter 时，Claude 会先问你再安装（都是全局安装）。
 - 项目原有代码如果 lint 不通过，在修好之前任何提交都过不了，包括提交关卡自己的文件。
 
