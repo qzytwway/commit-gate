@@ -15,6 +15,20 @@ commit-gate 用 Claude Code 的 hooks（在 Claude 执行某条命令前自动�
 1. **Lint 关**：提交前必须运行 `scripts/lint-gate.sh run`，而且通过的必须正好是当前暂存的内容。暂存区一变，就得重跑。
 2. **审查关**：一个没见过写代码过程的 Fable 5.2 代理单独读这次的改动，发现 bug、崩溃、安全问题、数据丢失等就拒绝提交，并列出 `文件:行号` 和原因。
 
+## 自动格式化
+
+`lint-gate.sh run` 在检查之前，会先把**这次要提交的文件**整理好格式，再重新加回暂存区。只动这次提交的文件，不碰别的：
+
+| 语言 | 格式化工具 |
+|------|------------|
+| Go | gofmt（装了 Go 就有） |
+| Python | ruff format |
+| JS / TS | 项目自己装的 prettier（找离文件最近的 `node_modules/.bin/prettier`，所以会用项目自己的配置和插件；没装就不动） |
+
+如果一个文件只有一部分改动加进了暂存区，它会拦下提交，并提示你把剩下的改动也加进去或者先收起来（stash）。不然重新加回暂存区时，会把你没打算提交的改动一起带进去。
+
+所以装了 commit-gate 的项目，不需要再装只负责格式化的 git pre-commit 钩子。
+
 ## Lint 怎么检查
 
 `lint-gate.sh run` 检查的是**整个项目**，不只是改动部分。它每次都根据 git 跟踪的文件扩展名自动判断项目里有哪些语言，再跑对应的内置 linter：
@@ -124,6 +138,7 @@ COVERED='vue sql'
 |------|------|
 | [SKILL.md](SKILL.md) | 给 Claude 看的安装步骤 |
 | [setup.sh](setup.sh) | 安装脚本 |
-| [lint-gate.sh](lint-gate.sh) | 复制到项目里的 lint 脚本 |
+| [lint-gate.sh](lint-gate.sh) | 复制到项目里的格式化 + lint 脚本 |
+| [test.sh](test.sh) | 格式化步骤的自检（`bash test.sh`） |
 | [lint-gate.conf](lint-gate.conf) | 默认项目设置 |
 | [hooks.json](hooks.json) | 要合并进项目的 hook 定义 |

@@ -1,6 +1,6 @@
 ---
 name: commit-gate
-description: Set up a commit gate in the current git repository so every commit Claude makes must first pass lint on every language in the project (detected automatically at each commit) and then an independent Fable 5.2 review of the staged diff. Use when the user asks to add, install or configure the lint gate, commit gate, commit review, "lint + Fable review before commit", or to copy this commit flow to another project.
+description: Set up a commit gate in the current git repository so every commit Claude makes is first auto-formatted, must pass lint on every language in the project (detected automatically at each commit) and then an independent Fable 5.2 review of the staged diff. Use when the user asks to add, install or configure the lint gate, commit gate, commit review, "lint + Fable review before commit", or to copy this commit flow to another project.
 ---
 
 # Commit gate
@@ -10,7 +10,14 @@ Installs two PreToolUse hooks on `Bash(git commit*)` in the project's `.claude/s
 1. **Lint check**: blocks the commit unless `scripts/lint-gate.sh run` passed for exactly what is staged now.
 2. **Fable 5.2 review**: an agent hook reads `.lint-gate/staged.diff` and rejects the commit if it finds bugs.
 
-`scripts/lint-gate.sh run` lints the **whole project**, not just the diff. At every run it
+`scripts/lint-gate.sh run` first formats the **staged** files and restages them: gofmt (Go),
+ruff format (Python), and for JS/TS the project's own prettier (the nearest
+`node_modules/.bin/prettier`, so its config and plugins apply; JS/TS is left as is when
+there is none). A staged file that also has unstaged edits blocks, since restaging it would
+pull those edits in. This replaces a git pre-commit hook that only formats: the project
+doesn't need one.
+
+It then lints the **whole project**, not just the diff. At every run it
 looks at the extensions of all tracked files and runs the built-in linter for each language
 found: golangci-lint (Go), ruff (Python), cargo clippy (Rust), oxlint with React rules (JS/TS), shellcheck
 (shell). It blocks when a linter fails, when a needed linter is not installed, or when a file
@@ -33,13 +40,15 @@ skipped silently. It gates only commits made by Claude, not the user's own termi
    ```markdown
    ## Committing
 
-   Stage the files, run `scripts/lint-gate.sh run`, then `git commit`. The script lints the
-   whole project with its built-in linter for every language it finds in the tracked files,
+   Stage the files, run `scripts/lint-gate.sh run`, then `git commit`. The script formats the
+   staged files and restages them (gofmt, ruff format, the project's own prettier for JS/TS),
+   then lints the whole project with its built-in linter for every language it finds in the tracked files,
    whatever lint setup the project has of its own. On success it records the staged tree and saves the staged diff
    in `.lint-gate/`. PreToolUse hooks in `.claude/settings.json` on `Bash(git commit*)` block
    the commit unless that record matches what is staged, and an independent Fable 5.2 agent
    reviews the saved diff and rejects the commit if it finds bugs. Restaging anything voids
-   the record, so rerun the script. When it reports a missing linter, ask the user before
+   the record, so rerun the script. Stage whole files: a file with unstaged edits left over
+   blocks the run. When it reports a missing linter, ask the user before
    installing it. When it reports a file type with no linter, add a command for it to
    `LINT_CMD` and the extension to `COVERED` in `scripts/lint-gate.conf`, or, only if it is
    not code, the extension to `NOT_CODE`. When blocked, fix
