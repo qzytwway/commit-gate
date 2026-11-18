@@ -13,7 +13,7 @@
 commit-gate 用 Claude Code 的 hooks（在 Claude 执行某条命令前自动触发的检查）把这些堵住：
 
 1. **Lint 关**：提交前必须运行 `scripts/lint-gate.sh run`，而且通过的必须正好是当前暂存的内容。暂存区一变，就得重跑。
-2. **审查关**：一个没见过写代码过程的 Fable 5.2 代理单独读这次的改动，发现 bug、崩溃、安全问题、数据丢失等就拒绝提交，并列出 `文件:行号` 和原因。
+2. **审查关**：一个没见过写代码过程的 Fable 5.2 代理单独读这次的改动，发现 bug、崩溃、安全问题、数据丢失等就拒绝提交，并列出 `文件:行号` 和原因。用 `git commit -a` 一把提交所有改动也会被它拒绝，要先把文件明确加进暂存区。
 
 ## 自动格式化
 
@@ -44,7 +44,7 @@ commit-gate 用 Claude Code 的 hooks（在 Claude 执行某条命令前自动�
 以下情况都会拦下提交（宁可拦错，不放过）：
 
 - 某个 linter 报错；
-- 需要的 linter 没安装（会打印安装命令）；
+- 需要的 linter 或格式化工具（gofmt、ruff）没安装（会打印安装命令）；
 - 出现了既不是已知语言、也不在“非代码”名单里的文件类型。
 
 ## 安装
@@ -129,8 +129,32 @@ COVERED='vue sql'
 ## 注意
 
 - 只管 Claude 发起的提交，你自己在终端里敲的 `git commit` 不受影响。因为关卡装在 Claude Code 的 hook 里（`.claude/settings.json`），不是 git 自己的 pre-commit hook（`.git/hooks/pre-commit`）。
-- 缺少 linter 时，Claude 会先问你再安装（都是全局安装）。
+- 缺少 linter 或格式化工具时，Claude 会先问你再安装（都是全局安装）。
 - 项目原有代码如果 lint 不通过，在修好之前任何提交都过不了，包括提交关卡自己的文件。
+- 每次提交都会启动一个 Fable 5.2 审查，最长等 15 分钟，也会消耗你的使用额度。
+- 项目里如果已经有自己的 git pre-commit 钩子，两者会各跑各的，不冲突。
+
+### 不能百分百拦住
+
+hook 每次都会运行，但它靠命令的样子判断“这是不是一次提交”：只认命令里以 `git commit` 开头的那一段（连在 `&&` 后面、前面带环境变量的也认得）。下面这些认不出来，提交会直接通过：
+
+- 换了写法的提交：`git -C 某目录 commit`，或者 git 别名（如 `git ci`）；
+- 不叫 commit 但也会生成提交的命令：`git merge`、`git cherry-pick`、`git revert`、`git rebase`、`git am`；
+- 藏在脚本里的提交：比如 `bash release.sh`，脚本里面再 `git commit`；
+- 不走命令行的提交：比如通过带 git 功能的 MCP 工具；
+- 配置没生效时：没新开会话、没信任项目设置，或在设置里关掉了所有 hook。
+
+Claude 平时提交几乎都是普通的 `git commit`，加上 `CLAUDE.md` 里写明了不许绕过，日常基本都会被拦住。但它不是硬性防线，挡不住有意绕过。
+
+### 升级
+
+更新 commit-gate 后，已经装过的项目还在用当初复制过去的旧脚本。到每个项目里重新运行一次安装（`/commit-gate` 或 `setup.sh`）才会换成新版。`scripts/lint-gate.conf` 不会被覆盖。
+
+### 卸载
+
+1. 删掉 `.claude/settings.json` 里 `hooks.PreToolUse` 下面包含 `lint-gate.sh check` 的那一组 hook；
+2. 删掉 `scripts/lint-gate.sh`、`scripts/lint-gate.conf` 和 `.lint-gate/` 目录；
+3. 删掉 `.gitignore` 里的 `.lint-gate/` 一行，以及 `CLAUDE.md` 里的“Committing”一段。
 
 ## 仓库文件
 
