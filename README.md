@@ -74,12 +74,43 @@ git add <文件>  →  scripts/lint-gate.sh run  →  git commit
 
 被拦下时，Claude 会修代码再重来，不会去关规则或绕过 hook。
 
-## 配置 `scripts/lint-gate.conf`
+## 自己加 lint
 
-一般保持为空。只有遇到内置 linter 不认识的文件类型时才需要改：
+项目设置在 `scripts/lint-gate.conf`，平时保持为空即可。这个文件重复安装也不会被覆盖，可以放心改。需要自己加 lint 时，分三种情况：
 
-- `LINT_CMD` + `COVERED`：给某种文件类型配一个 lint 命令，并把扩展名（不带点）写进 `COVERED`，例如 `vue sql`。
-- `NOT_CODE`：真的不是代码的文件（数据、素材、生成文件）的扩展名，跳过检查。不要把源码放进来。
+### 1. 内置五种语言以外的文件（最常见）
+
+比如项目里有 `.vue` 或 `.sql` 文件，lint-gate 会报“这种文件没有 linter”，然后拦下提交。在 `scripts/lint-gate.conf` 里写：
+
+```bash
+LINT_CMD='npx eslint --ext .vue .'   # 用来检查这类文件的命令
+COVERED='vue'                        # 这条命令负责的扩展名，不带点，多个用空格隔开
+```
+
+想跑好几个命令，就用 `&&` 连在同一个 `LINT_CMD` 里：
+
+```bash
+LINT_CMD='npx eslint --ext .vue . && sqlfluff lint .'
+COVERED='vue sql'
+```
+
+真的不是代码的文件（数据、素材、生成文件），把扩展名写进 `NOT_CODE` 就会跳过检查。不要把源码放进去。
+
+也可以直接跟 Claude 说“给 .vue 文件加上 lint”，它知道该改这里。
+
+### 2. 已支持的语言，想再多查一项
+
+比如 Python 除了 ruff 还想跑 mypy（类型检查），可以写 `LINT_CMD='mypy .'`。只要 `LINT_CMD` 不为空，它就会跑，而且是额外跑，内置的 ruff 照样会跑。`COVERED` 里不要写 `py`，那个列表只用来登记内置五种以外的文件类型。
+
+注意：[SKILL.md](SKILL.md) 让 Claude 不要把项目自己的 lint 命令放进 `LINT_CMD`，所以这一项要你明确跟它说，它才会加。
+
+### 3. 给所有项目换掉或新增一个内置 linter
+
+改本仓库的 [lint-gate.sh](lint-gate.sh)：在 `detect_languages` 里把扩展名对应到语言，再加一个 `lint_<语言>` 函数。改完后在每个装过关卡的项目里重新运行一次 `setup.sh`，新脚本才会复制过去。
+
+### 改配置也会被审查
+
+提交时的 AI 审查会盯着 `lint-gate.conf`。如果往 `COVERED` 里加了扩展名却没配一条真正能检查它的命令，或者把源码放进 `NOT_CODE`，这次提交会被拒，防止靠改配置绕过检查。
 
 ## 注意
 
